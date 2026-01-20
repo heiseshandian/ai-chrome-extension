@@ -157,6 +157,14 @@ function formatMarkdown(text) {
   // Convert markdown-style formatting to HTML
   let formatted = text;
 
+  // Headers: ## Header, ### Header, etc. (process before other formatting)
+  formatted = formatted.replace(/^###### (.+)$/gm, '<h6>$1</h6>');
+  formatted = formatted.replace(/^##### (.+)$/gm, '<h5>$1</h5>');
+  formatted = formatted.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+  formatted = formatted.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  formatted = formatted.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  formatted = formatted.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
   // Bold text: **text** or __text__
   formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   formatted = formatted.replace(/__(.+?)__/g, '<strong>$1</strong>');
