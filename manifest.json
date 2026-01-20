@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "AI Assistant Sidebar",
+  "version": "1.0.0",
+  "description": "Chrome extension with sidebar to interact with Claude, Gemini, and ChatGPT",
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "sidePanel",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.openai.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Open AI Assistant"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

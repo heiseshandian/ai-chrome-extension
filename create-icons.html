@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Icon Generator</title>
+</head>
+<body>
+  <h1>Icon Generator</h1>
+  <p>Open browser console and copy the data URLs, then save them as PNG files.</p>
+
+  <script>
+    function createIcon(size) {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      // Create gradient background
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#667eea');
+      gradient.addColorStop(1, '#764ba2');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, size, size);
+
+      // Add white text
+      ctx.fillStyle = 'white';
+      ctx.font = `bold ${size * 0.4}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('AI', size / 2, size / 2);
+
+      return canvas.toDataURL('image/png');
+    }
+
+    console.log('Icon 16x16:');
+    console.log(createIcon(16));
+    console.log('\nIcon 48x48:');
+    console.log(createIcon(48));
+    console.log('\nIcon 128x128:');
+    console.log(createIcon(128));
+
+    // Auto-download icons
+    [16, 48, 128].forEach(size => {
+      const link = document.createElement('a');
+      link.download = `icon${size}.png`;
+      link.href = createIcon(size);
+      link.click();
+    });
+
+    alert('Icons downloaded! Check your downloads folder for icon16.png, icon48.png, and icon128.png. Move them to the icons/ folder.');
+  </script>
+</body>
+</html>
