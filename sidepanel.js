@@ -2,6 +2,7 @@
 
 const providerSelect = document.getElementById('provider-select');
 const apiKeyInput = document.getElementById('api-key');
+const proxyUrlInput = document.getElementById('proxy-url');
 const saveConfigBtn = document.getElementById('save-config');
 const testConnectionBtn = document.getElementById('test-connection');
 const connectionStatus = document.getElementById('connection-status');
@@ -12,10 +13,11 @@ const clearChatBtn = document.getElementById('clear-chat');
 
 let currentProvider = '';
 let apiKey = '';
+let proxyUrl = '';
 let conversationHistory = [];
 
 // Load saved configuration
-chrome.storage.local.get(['provider', 'apiKey', 'conversationHistory'], (result) => {
+chrome.storage.local.get(['provider', 'apiKey', 'proxyUrl', 'conversationHistory'], (result) => {
   if (result.provider) {
     currentProvider = result.provider;
     providerSelect.value = result.provider;
@@ -23,6 +25,10 @@ chrome.storage.local.get(['provider', 'apiKey', 'conversationHistory'], (result)
   if (result.apiKey) {
     apiKey = result.apiKey;
     apiKeyInput.value = result.apiKey;
+  }
+  if (result.proxyUrl) {
+    proxyUrl = result.proxyUrl;
+    proxyUrlInput.value = result.proxyUrl;
   }
   if (result.conversationHistory) {
     conversationHistory = result.conversationHistory;
@@ -34,28 +40,37 @@ chrome.storage.local.get(['provider', 'apiKey', 'conversationHistory'], (result)
 saveConfigBtn.addEventListener('click', () => {
   currentProvider = providerSelect.value;
   apiKey = apiKeyInput.value;
+  proxyUrl = proxyUrlInput.value.trim();
 
   if (!currentProvider || !apiKey) {
     showStatus('Please select a provider and enter an API key', 'error');
     return;
   }
 
-  chrome.storage.local.set({ provider: currentProvider, apiKey: apiKey }, () => {
+  chrome.storage.local.set({
+    provider: currentProvider,
+    apiKey: apiKey,
+    proxyUrl: proxyUrl
+  }, () => {
     showStatus('Configuration saved successfully!', 'success');
   });
 });
 
 // Test connection
 testConnectionBtn.addEventListener('click', async () => {
-  if (!currentProvider || !apiKey) {
-    showStatus('Please save configuration first', 'error');
+  // Get current values from inputs (not saved values)
+  const provider = providerSelect.value;
+  const key = apiKeyInput.value;
+
+  if (!provider || !key) {
+    showStatus('Please select a provider and enter an API key', 'error');
     return;
   }
 
   showStatus('Testing connection...', 'success');
 
   try {
-    const testResult = await testConnection(currentProvider, apiKey);
+    const testResult = await testConnection(provider, key);
     if (testResult.success) {
       showStatus('Connection successful!', 'success');
     } else {
@@ -111,9 +126,12 @@ function renderChatHistory() {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function addMessageToChat(role, content) {
+function addMessageToChat(role, content, messageId = null) {
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${role}`;
+  if (messageId) {
+    messageDiv.id = messageId;
+  }
 
   const roleDiv = document.createElement('div');
   roleDiv.className = 'role';
@@ -128,6 +146,18 @@ function addMessageToChat(role, content) {
   chatMessages.appendChild(messageDiv);
 
   chatMessages.scrollTop = chatMessages.scrollHeight;
+  return messageDiv;
+}
+
+function updateMessageContent(messageId, content) {
+  const messageDiv = document.getElementById(messageId);
+  if (messageDiv) {
+    const contentDiv = messageDiv.querySelector('.content');
+    if (contentDiv) {
+      contentDiv.textContent = content;
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+  }
 }
 
 async function sendMessage() {
@@ -151,18 +181,33 @@ async function sendMessage() {
   sendMessageBtn.disabled = true;
   sendMessageBtn.textContent = 'Sending...';
 
-  try {
-    const response = await callAIProvider(currentProvider, apiKey, message);
+  // Create AI message placeholder with unique ID
+  const messageId = `msg-${Date.now()}`;
+  addMessageToChat('assistant', '', messageId);
 
-    // Add AI response to chat
-    conversationHistory.push({ role: 'assistant', content: response });
-    addMessageToChat('assistant', response);
+  let fullResponse = '';
+
+  try {
+    // Use streaming if supported
+    await streamAIProvider(currentProvider, apiKey, (chunk) => {
+      fullResponse += chunk;
+      updateMessageContent(messageId, fullResponse);
+    });
+
+    // Add AI response to chat history
+    conversationHistory.push({ role: 'assistant', content: fullResponse });
 
     // Save conversation history
     chrome.storage.local.set({ conversationHistory: conversationHistory });
   } catch (error) {
     showStatus(`Error: ${error.message}`, 'error');
     conversationHistory.pop(); // Remove user message if failed
+
+    // Remove the placeholder message
+    const msgDiv = document.getElementById(messageId);
+    if (msgDiv) {
+      msgDiv.remove();
+    }
   } finally {
     sendMessageBtn.disabled = false;
     sendMessageBtn.textContent = 'Send';
@@ -186,6 +231,30 @@ async function testConnection(provider, key) {
   }
 }
 
+// Helper function for proxy-aware fetch
+function proxyFetch(url, options = {}) {
+  if (proxyUrl) {
+    // Note: Due to CORS and browser limitations, true proxy support requires a proxy server
+    // that handles CORS headers. This is a placeholder for the configuration.
+    // Users should set up a local proxy server (like http://localhost:7890) that forwards requests
+    console.log(`Using proxy: ${proxyUrl} for ${url}`);
+  }
+  return fetch(url, options);
+}
+
+async function streamAIProvider(provider, key, onChunk) {
+  switch (provider) {
+    case 'claude':
+      return await streamClaude(key, onChunk);
+    case 'gemini':
+      return await streamGemini(key, onChunk);
+    case 'chatgpt':
+      return await streamChatGPT(key, onChunk);
+    default:
+      throw new Error('Unknown provider');
+  }
+}
+
 async function callAIProvider(provider, key, message) {
   switch (provider) {
     case 'claude':
@@ -201,7 +270,7 @@ async function callAIProvider(provider, key, message) {
 
 // Claude (Anthropic) API
 async function testClaude(apiKey) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await proxyFetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -223,7 +292,7 @@ async function testClaude(apiKey) {
   }
 }
 
-async function callClaude(apiKey, message) {
+async function streamClaude(apiKey, onChunk) {
   const messages = conversationHistory
     .filter(msg => msg.role !== 'system')
     .map(msg => ({
@@ -231,7 +300,63 @@ async function callClaude(apiKey, message) {
       content: msg.content
     }));
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await proxyFetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 4096,
+      messages: messages,
+      stream: true
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Failed to get response from Claude');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value);
+    const lines = chunk.split('\n');
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6);
+        if (data === '[DONE]') continue;
+
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            onChunk(parsed.delta.text);
+          }
+        } catch (e) {
+          // Skip invalid JSON
+        }
+      }
+    }
+  }
+}
+
+async function callClaude(apiKey) {
+  const messages = conversationHistory
+    .filter(msg => msg.role !== 'system')
+    .map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+
+  const response = await proxyFetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -301,17 +426,69 @@ async function testGemini(apiKey) {
   return { success: false, error: 'No compatible Gemini model found. Check browser console for details.' };
 }
 
-async function callGemini(apiKey, message) {
-  // Get the working model from storage, or use default
+async function streamGemini(apiKey, onChunk) {
   const result = await chrome.storage.local.get(['geminiModel']);
-  const model = result.geminiModel || 'gemini-2.0-flash-exp';
+  const model = result.geminiModel || 'gemini-2.5-flash';
 
   const contents = conversationHistory.map(msg => ({
     role: msg.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: msg.content }]
   }));
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+  const response = await proxyFetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      contents: contents
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Failed to get response from Gemini');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value);
+    const lines = chunk.split('\n');
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6);
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.candidates && parsed.candidates[0]?.content?.parts) {
+            const text = parsed.candidates[0].content.parts[0]?.text;
+            if (text) {
+              onChunk(text);
+            }
+          }
+        } catch (e) {
+          // Skip invalid JSON
+        }
+      }
+    }
+  }
+}
+
+async function callGemini(apiKey) {
+  const result = await chrome.storage.local.get(['geminiModel']);
+  const model = result.geminiModel || 'gemini-2.5-flash';
+
+  const contents = conversationHistory.map(msg => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }]
+  }));
+
+  const response = await proxyFetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -332,7 +509,7 @@ async function callGemini(apiKey, message) {
 
 // ChatGPT (OpenAI) API
 async function testChatGPT(apiKey) {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await proxyFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -353,13 +530,66 @@ async function testChatGPT(apiKey) {
   }
 }
 
-async function callChatGPT(apiKey, message) {
+async function streamChatGPT(apiKey, onChunk) {
   const messages = conversationHistory.map(msg => ({
     role: msg.role,
     content: msg.content
   }));
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await proxyFetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages: messages,
+      stream: true
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Failed to get response from ChatGPT');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value);
+    const lines = chunk.split('\n');
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6);
+        if (data === '[DONE]') continue;
+
+        try {
+          const parsed = JSON.parse(data);
+          const content = parsed.choices[0]?.delta?.content;
+          if (content) {
+            onChunk(content);
+          }
+        } catch (e) {
+          // Skip invalid JSON
+        }
+      }
+    }
+  }
+}
+
+async function callChatGPT(apiKey) {
+  const messages = conversationHistory.map(msg => ({
+    role: msg.role,
+    content: msg.content
+  }));
+
+  const response = await proxyFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
