@@ -8,7 +8,6 @@ const testConnectionBtn = document.getElementById('test-connection');
 const connectionStatus = document.getElementById('connection-status');
 const chatMessages = document.getElementById('chat-messages');
 const userInput = document.getElementById('user-input');
-const sendMessageBtn = document.getElementById('send-message');
 const clearChatBtn = document.getElementById('clear-chat');
 const configHeader = document.getElementById('config-header');
 const configContent = document.getElementById('config-content');
@@ -113,11 +112,7 @@ testConnectionBtn.addEventListener('click', async () => {
   }
 });
 
-// Send message
-sendMessageBtn.addEventListener('click', () => {
-  sendMessage();
-});
-
+// Send message on Enter key
 userInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
@@ -249,9 +244,9 @@ async function sendMessage() {
   addMessageToChat('user', message);
   userInput.value = '';
 
-  // Disable send button
-  sendMessageBtn.disabled = true;
-  sendMessageBtn.textContent = 'Sending...';
+  // Disable input while sending
+  userInput.disabled = true;
+  userInput.placeholder = 'Sending...';
 
   // Create AI message placeholder with unique ID
   const messageId = `msg-${Date.now()}`;
@@ -281,8 +276,8 @@ async function sendMessage() {
       msgDiv.remove();
     }
   } finally {
-    sendMessageBtn.disabled = false;
-    sendMessageBtn.textContent = 'Send';
+    userInput.disabled = false;
+    userInput.placeholder = 'Type your message or use context menu to send selected text... (Press Enter to send)';
   }
 }
 
