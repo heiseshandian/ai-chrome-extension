@@ -1,11 +1,11 @@
 # AI Assistant Chrome Extension
 
-A Chrome extension with Manifest V3 that provides a sidebar to interact with Claude, Gemini, and ChatGPT. Select text on any webpage and send it to your chosen AI provider via context menu.
+A Chrome extension with Manifest V3 that provides a sidebar to interact with Claude and Gemini. Select text on any webpage and send it to your chosen AI provider via context menu.
 
 ## Features
 
 - **Right-Side Panel**: 500px wide sidebar on the right side of your browser
-- **Multiple AI Providers**: Support for Claude (Anthropic), Gemini (Google), and ChatGPT (OpenAI)
+- **Multiple AI Providers**: Support for Claude (Anthropic) and Gemini (Google)
 - **Context Menu Integration**: Double-click or select text, then right-click to send to AI
 - **Streaming Responses**: Real-time streaming output as the AI generates responses
 - **Conversation History**: Maintains chat history across sessions
@@ -33,7 +33,6 @@ A Chrome extension with Manifest V3 that provides a sidebar to interact with Cla
    - Enter your API key:
      - **Claude**: Get from [Anthropic Console](https://console.anthropic.com/)
      - **Gemini**: Get from [Google AI Studio](https://makersuite.google.com/app/apikey)
-     - **ChatGPT**: Get from [OpenAI Platform](https://platform.openai.com/api-keys)
    - (Optional) Enter proxy URL if needed (e.g., `http://localhost:7890`)
    - Click "Save Configuration"
    - Click "Test Connection" to verify
@@ -72,7 +71,6 @@ ai-chrome-extension/
 
 - **Claude**: `https://api.anthropic.com/v1/messages`
 - **Gemini**: `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent`
-- **ChatGPT**: `https://api.openai.com/v1/chat/completions`
 
 ## Proxy Configuration
 

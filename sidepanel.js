@@ -15,16 +15,21 @@ let currentProvider = '';
 let apiKey = '';
 let proxyUrl = '';
 let conversationHistory = [];
+let apiKeys = {}; // Store API keys per provider
 
 // Load saved configuration
-chrome.storage.local.get(['provider', 'apiKey', 'proxyUrl', 'conversationHistory'], (result) => {
+chrome.storage.local.get(['provider', 'apiKeys', 'proxyUrl', 'conversationHistory'], (result) => {
   if (result.provider) {
     currentProvider = result.provider;
     providerSelect.value = result.provider;
   }
-  if (result.apiKey) {
-    apiKey = result.apiKey;
-    apiKeyInput.value = result.apiKey;
+  if (result.apiKeys) {
+    apiKeys = result.apiKeys;
+    // Load API key for current provider
+    if (currentProvider && apiKeys[currentProvider]) {
+      apiKey = apiKeys[currentProvider];
+      apiKeyInput.value = apiKeys[currentProvider];
+    }
   }
   if (result.proxyUrl) {
     proxyUrl = result.proxyUrl;
@@ -33,6 +38,17 @@ chrome.storage.local.get(['provider', 'apiKey', 'proxyUrl', 'conversationHistory
   if (result.conversationHistory) {
     conversationHistory = result.conversationHistory;
     renderChatHistory();
+  }
+});
+
+// Handle provider change
+providerSelect.addEventListener('change', () => {
+  const selectedProvider = providerSelect.value;
+  // Load cached API key for the selected provider
+  if (apiKeys[selectedProvider]) {
+    apiKeyInput.value = apiKeys[selectedProvider];
+  } else {
+    apiKeyInput.value = '';
   }
 });
 
@@ -47,9 +63,12 @@ saveConfigBtn.addEventListener('click', () => {
     return;
   }
 
+  // Save API key for the current provider
+  apiKeys[currentProvider] = apiKey;
+
   chrome.storage.local.set({
     provider: currentProvider,
-    apiKey: apiKey,
+    apiKeys: apiKeys,
     proxyUrl: proxyUrl
   }, () => {
     showStatus('Configuration saved successfully!', 'success');
@@ -221,8 +240,6 @@ async function testConnection(provider, key) {
         return await testClaude(key);
       case 'gemini':
         return await testGemini(key);
-      case 'chatgpt':
-        return await testChatGPT(key);
       default:
         return { success: false, error: 'Unknown provider' };
     }
@@ -248,8 +265,6 @@ async function streamAIProvider(provider, key, onChunk) {
       return await streamClaude(key, onChunk);
     case 'gemini':
       return await streamGemini(key, onChunk);
-    case 'chatgpt':
-      return await streamChatGPT(key, onChunk);
     default:
       throw new Error('Unknown provider');
   }
@@ -261,8 +276,6 @@ async function callAIProvider(provider, key, message) {
       return await callClaude(key, message);
     case 'gemini':
       return await callGemini(key, message);
-    case 'chatgpt':
-      return await callChatGPT(key, message);
     default:
       throw new Error('Unknown provider');
   }
@@ -275,7 +288,8 @@ async function testClaude(apiKey) {
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
     },
     body: JSON.stringify({
       model: 'claude-3-5-sonnet-20241022',
@@ -305,7 +319,8 @@ async function streamClaude(apiKey, onChunk) {
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
     },
     body: JSON.stringify({
       model: 'claude-3-5-sonnet-20241022',
@@ -361,7 +376,8 @@ async function callClaude(apiKey) {
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
     },
     body: JSON.stringify({
       model: 'claude-3-5-sonnet-20241022',
@@ -505,107 +521,4 @@ async function callGemini(apiKey) {
 
   const data = await response.json();
   return data.candidates[0].content.parts[0].text;
-}
-
-// ChatGPT (OpenAI) API
-async function testChatGPT(apiKey) {
-  const response = await proxyFetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: 'Hi' }],
-      max_tokens: 10
-    })
-  });
-
-  if (response.ok) {
-    return { success: true };
-  } else {
-    const error = await response.json();
-    return { success: false, error: error.error?.message || 'Unknown error' };
-  }
-}
-
-async function streamChatGPT(apiKey, onChunk) {
-  const messages = conversationHistory.map(msg => ({
-    role: msg.role,
-    content: msg.content
-  }));
-
-  const response = await proxyFetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: messages,
-      stream: true
-    })
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'Failed to get response from ChatGPT');
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value);
-    const lines = chunk.split('\n');
-
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = line.slice(6);
-        if (data === '[DONE]') continue;
-
-        try {
-          const parsed = JSON.parse(data);
-          const content = parsed.choices[0]?.delta?.content;
-          if (content) {
-            onChunk(content);
-          }
-        } catch (e) {
-          // Skip invalid JSON
-        }
-      }
-    }
-  }
-}
-
-async function callChatGPT(apiKey) {
-  const messages = conversationHistory.map(msg => ({
-    role: msg.role,
-    content: msg.content
-  }));
-
-  const response = await proxyFetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: messages
-    })
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'Failed to get response from ChatGPT');
-  }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
 }

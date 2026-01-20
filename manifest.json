@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "AI Assistant Sidebar",
   "version": "1.0.0",
-  "description": "Chrome extension with sidebar to interact with Claude, Gemini, and ChatGPT",
+  "description": "Chrome extension with sidebar to interact with Claude and Gemini",
   "permissions": [
     "storage",
     "contextMenus",
@@ -12,7 +12,6 @@
   "host_permissions": [
     "https://api.anthropic.com/*",
     "https://generativelanguage.googleapis.com/*",
-    "https://api.openai.com/*",
     "http://localhost/*",
     "http://127.0.0.1/*"
   ],
