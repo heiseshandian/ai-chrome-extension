@@ -10,12 +10,25 @@ const chatMessages = document.getElementById('chat-messages');
 const userInput = document.getElementById('user-input');
 const sendMessageBtn = document.getElementById('send-message');
 const clearChatBtn = document.getElementById('clear-chat');
+const configHeader = document.getElementById('config-header');
+const configContent = document.getElementById('config-content');
+const toggleIcon = document.querySelector('.toggle-icon');
 
 let currentProvider = '';
 let apiKey = '';
 let proxyUrl = '';
 let conversationHistory = [];
 let apiKeys = {}; // Store API keys per provider
+
+// Set initial collapsed state
+configContent.classList.add('collapsed');
+toggleIcon.classList.add('collapsed');
+
+// Toggle configuration section
+configHeader.addEventListener('click', () => {
+  configContent.classList.toggle('collapsed');
+  toggleIcon.classList.toggle('collapsed');
+});
 
 // Load saved configuration
 chrome.storage.local.get(['provider', 'apiKeys', 'proxyUrl', 'conversationHistory'], (result) => {
@@ -145,6 +158,39 @@ function renderChatHistory() {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
+function formatMarkdown(text) {
+  // Convert markdown-style formatting to HTML
+  let formatted = text;
+
+  // Bold text: **text** or __text__
+  formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  formatted = formatted.replace(/__(.+?)__/g, '<strong>$1</strong>');
+
+  // Italic text: *text* or _text_
+  formatted = formatted.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  formatted = formatted.replace(/_(.+?)_/g, '<em>$1</em>');
+
+  // Code blocks: ```code```
+  formatted = formatted.replace(/```(.+?)```/gs, '<pre><code>$1</code></pre>');
+
+  // Inline code: `code`
+  formatted = formatted.replace(/`(.+?)`/g, '<code>$1</code>');
+
+  // Convert newlines to <br> for better spacing
+  formatted = formatted.replace(/\n/g, '<br>');
+
+  // Convert bullet points
+  formatted = formatted.replace(/^\* (.+)$/gm, '<li>$1</li>');
+  formatted = formatted.replace(/^- (.+)$/gm, '<li>$1</li>');
+
+  // Wrap consecutive <li> tags in <ul>
+  formatted = formatted.replace(/(<li>.*?<\/li>)(\s*<li>.*?<\/li>)*/g, (match) => {
+    return '<ul>' + match + '</ul>';
+  });
+
+  return formatted;
+}
+
 function addMessageToChat(role, content, messageId = null) {
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${role}`;
@@ -158,7 +204,13 @@ function addMessageToChat(role, content, messageId = null) {
 
   const contentDiv = document.createElement('div');
   contentDiv.className = 'content';
-  contentDiv.textContent = content;
+
+  // Use HTML formatting for AI messages, plain text for user messages
+  if (role === 'assistant') {
+    contentDiv.innerHTML = formatMarkdown(content);
+  } else {
+    contentDiv.textContent = content;
+  }
 
   messageDiv.appendChild(roleDiv);
   messageDiv.appendChild(contentDiv);
@@ -173,7 +225,8 @@ function updateMessageContent(messageId, content) {
   if (messageDiv) {
     const contentDiv = messageDiv.querySelector('.content');
     if (contentDiv) {
-      contentDiv.textContent = content;
+      // Use HTML formatting for streaming AI responses
+      contentDiv.innerHTML = formatMarkdown(content);
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
   }

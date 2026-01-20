@@ -45,6 +45,39 @@ header h1 {
   color: #333;
 }
 
+.config-header {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  margin-bottom: 15px;
+}
+
+.config-header:hover {
+  color: #667eea;
+}
+
+.toggle-icon {
+  font-size: 12px;
+  transition: transform 0.3s ease;
+}
+
+.toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.config-content {
+  max-height: 500px;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.config-content.collapsed {
+  max-height: 0;
+}
+
 .provider-selection {
   margin-bottom: 15px;
 }
@@ -182,8 +215,60 @@ button {
 
 .message .content {
   font-size: 14px;
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+.message .content strong {
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.message.assistant .content strong {
+  color: #2d3748;
+}
+
+.message .content em {
+  font-style: italic;
+}
+
+.message .content code {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.message .content pre {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 10px;
+  border-radius: 5px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.message .content pre code {
+  background: none;
+  padding: 0;
+  display: block;
+  white-space: pre;
+}
+
+.message .content ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.message .content li {
+  margin: 4px 0;
   line-height: 1.5;
-  white-space: pre-wrap;
+}
+
+.message .content br {
+  display: block;
+  margin: 4px 0;
+  content: "";
 }
 
 .input-section {

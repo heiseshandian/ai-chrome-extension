@@ -3,12 +3,7 @@
   "name": "AI Assistant Sidebar",
   "version": "1.0.0",
   "description": "Chrome extension with sidebar to interact with Claude and Gemini",
-  "permissions": [
-    "storage",
-    "contextMenus",
-    "sidePanel",
-    "activeTab"
-  ],
+  "permissions": ["storage", "contextMenus", "sidePanel", "activeTab"],
   "host_permissions": [
     "https://api.anthropic.com/*",
     "https://generativelanguage.googleapis.com/*",
